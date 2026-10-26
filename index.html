@@ -47,7 +47,6 @@
                     if (user) {
                         window.isCloudConnected = true;
                         if (window.updateCloudStatusUI) window.updateCloudStatusUI(true);
-                        if (window.setupRealtimeListeners) window.setupRealtimeListeners(appId);
                     }
                 });
             } catch (err) {
@@ -79,6 +78,9 @@
                 top: 0;
                 width: 100%;
             }
+            .no-print {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -99,7 +101,7 @@
             <div class="flex items-center space-x-2">
                 <div id="cloud-status-badge" class="px-3 py-1 bg-white/10 rounded-full text-xs font-medium flex items-center space-x-2">
                     <span id="cloud-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                    <span id="cloud-status-text">Cloud Sync: Connecting...</span>
+                    <span id="cloud-status-text">Cloud Sync: Mod Luar Talian</span>
                 </div>
             </div>
         </div>
@@ -191,14 +193,18 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="font-bold text-slate-800 text-base">Rekod Kehadiran RMT</h3>
-                            <span id="live-indicator" class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Real-time Multi-Device Sync
+                            <span id="live-indicator" class="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Sync Multi-Device
                             </span>
                         </div>
                         <p class="text-xs text-slate-500">Senarai automatik rekod imbasan Kod QR murid yang dikemaskini terus di semua peranti</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                        <!-- Date Filter Dropdown & Picker -->
+                        <button onclick="fetchFromGoogleSheet()" class="px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-rotate text-xs"></i>
+                            <span>Segarkan Data</span>
+                        </button>
+
                         <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs">
                             <i class="fa-solid fa-calendar-days text-slate-400 pl-1"></i>
                             <select id="date-filter-type" onchange="handleDateFilterChange()" class="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer">
@@ -257,10 +263,8 @@
 
                     <!-- Scanner Video Container -->
                     <div class="relative w-full aspect-video bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800">
-                        <!-- QR Reader Render Target -->
                         <div id="qr-reader" class="w-full h-full"></div>
 
-                        <!-- Overlay Placeholder -->
                         <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-900/90 space-y-3 z-10">
                             <i class="fa-solid fa-camera text-4xl text-slate-600"></i>
                             <p class="text-xs">Sila tekan "Aktifkan Pengimbas QR" di bawah</p>
@@ -285,12 +289,11 @@
 
                 <!-- Manual Input & Recognition Result Box -->
                 <div class="lg:col-span-5 space-y-6">
-                    <!-- Manual QR Code Input Box -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
                         <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
                             <i class="fa-solid fa-keyboard text-teal-600"></i> Masukkan ID / Kod QR Manual
                         </h3>
-                        <p class="text-xs text-slate-500">Gunakan jika kamera mengalami gangguan atau menggunakan pengimbas kod bar fizikal (barcode scanner).</p>
+                        <p class="text-xs text-slate-500">Gunakan jika kamera mengalami gangguan atau menggunakan pengimbas kod bar fizikal.</p>
 
                         <div class="flex gap-2">
                             <input type="text" id="manual-qr-input" placeholder="Contoh: RMT001" class="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -306,7 +309,6 @@
                         </div>
                     </div>
 
-                    <!-- Latest Scan Result Panel -->
                     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
                         <div class="flex justify-between items-center border-b border-slate-100 pb-3">
                             <h3 class="font-bold text-slate-800 text-sm">Keputusan Imbasan Terkini</h3>
@@ -349,1263 +351,862 @@
             </div>
         </div>
 
-        <!-- TAB 3: SENARAI KAD QR MURID -->
+        <!-- TAB 3: STUDENT QR CARDS GENERATOR & PRINTING -->
         <div id="tab-students" class="tab-content hidden space-y-6">
-            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-base">Senarai Kad QR Murid RMT Terdaftar</h3>
-                        <p class="text-xs text-slate-500">Kad ID murid beserta Kod QR untuk dicetak atau dimuat turun</p>
-                    </div>
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">Kad Kod QR Murid RMT</h3>
+                    <p class="text-xs text-slate-500">Jana dan cetak kad QR fizikal untuk diserahkan kepada murid-murid RMT</p>
                 </div>
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <button onclick="window.print()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-print"></i> Cetak Semua Kad QR
+                    </button>
+                    <button onclick="openAddStudentModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition">
+                        <i class="fa-solid fa-user-plus"></i> Tambah Murid
+                    </button>
+                </div>
+            </div>
 
-                <!-- Students Grid -->
-                <div id="students-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <!-- Populated by JS -->
-                </div>
+            <!-- Print Target Container -->
+            <div id="printable-qr-area" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamically Generated QR Cards -->
             </div>
         </div>
 
-        <!-- TAB 4: ADMIN PANEL (Protected with Password '123') -->
+        <!-- TAB 4: ADMIN PANEL & GOOGLE SHEETS SETTINGS -->
         <div id="tab-admin" class="tab-content hidden space-y-6">
-            <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
-                <div>
-                    <h3 class="font-bold text-lg flex items-center gap-2">
-                        <i class="fa-solid fa-user-shield"></i> Panel Pentadbir RMT
-                    </h3>
-                    <p class="text-xs text-amber-100">Pendaftaran murid baru, pengemaskinian data, pencetakan QR, dan tetapan Live Google Sheets</p>
-                </div>
-                <button onclick="lockAdminSession()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-lock"></i> Log Keluar Admin
-                </button>
-            </div>
-
-            <!-- GitHub Pages 404 Diagnostic Banner -->
-            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 sm:p-5 text-slate-800 space-y-3">
-                <div class="flex items-center space-x-3 text-blue-700">
-                    <i class="fa-brands fa-github text-2xl shrink-0"></i>
-                    <div>
-                        <h4 class="font-bold text-sm">Panduan Selesai Ralat "404 File Not Found" GitHub Pages</h4>
-                        <p class="text-xs text-blue-600">Langkah mudah untuk memastikan sistem ini boleh diakses secara dalam talian melalui GitHub Pages</p>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
-                    <div class="bg-white p-3 rounded-xl border border-blue-100">
-                        <span class="font-bold text-blue-700 block mb-1">1. Nama Fail Standard</span>
-                        <p class="text-slate-600 text-[11px]">Pastikan fail web dinamakan <code class="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono font-bold">index.html</code> (huruf kecil sepenuhnya) di folder utama (root).</p>
-                    </div>
-                    <div class="bg-white p-3 rounded-xl border border-blue-100">
-                        <span class="font-bold text-blue-700 block mb-1">2. Tetapan GitHub Pages</span>
-                        <p class="text-slate-600 text-[11px]">Pergi ke <b>Settings &rarr; Pages &rarr; Branch</b>. Pilih <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">main</code> dan folder <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">/(root)</code>, kemudian tekan <b>Save</b>.</p>
-                    </div>
-                    <div class="bg-white p-3 rounded-xl border border-blue-100">
-                        <span class="font-bold text-blue-700 block mb-1">3. Tunggu Deployment</span>
-                        <p class="text-slate-600 text-[11px]">Proses binaan memerlukan 1-3 minit. Semak di tab <b>Actions</b> sehingga terdapat tanda semakan hijau (&check;).</p>
-                    </div>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <!-- Registration Form & Bulk Import -->
-                <div class="lg:col-span-6 space-y-6">
-                    <!-- Daftar Murid Individu -->
-                    <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                        <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-user-plus text-emerald-600"></i> Daftar Murid RMT Baharu (Individu)
-                        </h3>
-
-                        <form id="form-register-student" onsubmit="handleRegisterStudent(event)" class="space-y-4">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1">Nama Penuh Murid</label>
-                                <input type="text" id="reg-name" required placeholder="Contoh: Muhammad Amirul Bin Rosli" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Murid</label>
-                                <input type="text" id="reg-class" required placeholder="Contoh: 4 Cemerlang" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            </div>
-
-                            <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2 mt-2">
-                                <i class="fa-solid fa-floppy-disk"></i> Simpan &amp; Jana Kod QR Murid
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Daftar Murid Pukal (Bulk Import) -->
-                    <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                        <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-3 flex items-center gap-2">
-                            <i class="fa-solid fa-users-medical text-teal-600"></i> Tambah Murid Secara Pukal (Bulk Import)
-                        </h3>
-                        <p class="text-xs text-slate-500">Masukkan senarai murid (satu baris bagi setiap murid) dalam format: <br><span class="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-semibold">Nama Murid, Kelas</span></p>
-
-                        <!-- Pilihan 1: Muat Naik Dokumen CSV/TXT -->
-                        <div class="bg-teal-50/60 p-4 rounded-xl border border-teal-200/80 space-y-2">
-                            <label class="block text-xs font-bold text-teal-800 flex items-center gap-1.5">
-                                <i class="fa-solid fa-file-arrow-up text-sm"></i> Upload Dokumen (CSV / TXT)
-                            </label>
-                            <input type="file" id="file-upload-input" accept=".csv, .txt" onchange="handleFileUpload(event)" class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 file:cursor-pointer transition">
-                            <p class="text-[10px] text-teal-600">Pilih fail `.csv` atau `.txt` yang mengandungi format `Nama, Kelas` pada setiap baris.</p>
+                <!-- Google Sheets Webhook Configuration -->
+                <div class="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-5">
+                    <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                                <i class="fa-solid fa-file-excel text-emerald-600"></i> Integrasi Live Google Sheets
+                            </h3>
+                            <p class="text-xs text-slate-500">Sambungkan sistem imbasan ini secara terus ke Google Sheet sekolah anda</p>
                         </div>
-
-                        <div class="relative flex py-1 items-center">
-                            <div class="flex-grow border-t border-slate-200"></div>
-                            <span class="flex-shrink mx-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Atau Tulis / Tampal Manual</span>
-                            <div class="flex-grow border-t border-slate-200"></div>
-                        </div>
-
-                        <form id="form-bulk-student" onsubmit="handleBulkRegisterStudents(event)" class="space-y-4">
-                            <div>
-                                <textarea id="bulk-input" rows="5" required placeholder="Ahmad Bin Zulkifli, 4 Ibnu Sina&#10;Siti Nurhaliza Binti Hassan, 3 Cemerlang&#10;Muhammad Adam Rayyan, 2 Pintar" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 leading-relaxed"></textarea>
-                            </div>
-
-                            <button type="submit" class="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-file-import"></i> Import &amp; Jana Semua Kod QR Pukal
-                            </button>
-                        </form>
+                        <span id="sheet-status-badge" class="px-2.5 py-1 bg-slate-100 text-slate-600 font-bold text-xs rounded-full">
+                            Tutup
+                        </span>
                     </div>
-                </div>
-
-                <!-- Google Sheets Settings -->
-                <div class="lg:col-span-6 bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-5">
-                    <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-file-excel text-emerald-600"></i> Integrasi Live Google Sheets API
-                    </h3>
 
                     <div class="space-y-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-700 mb-1">Google Apps Script Web App URL</label>
-                            <input type="url" id="gs-app-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
-                            <p class="text-[11px] text-slate-400 mt-1">Masukkan Web App URL yang disiarkan (Deploy as Web App &rarr; Anyone) dari Google Sheets anda.</p>
+                            <input type="text" id="gsheet-url" placeholder="https://script.google.com/macros/s/AKfycbx.../exec" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <p class="text-[11px] text-slate-400 mt-1">Sediakan Web App melalui Google Apps Script di Google Sheet anda dan masukkan URL penyebaran (deployment URL) di sini.</p>
                         </div>
 
-                        <button onclick="saveGSUrl()" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-link"></i> Simpan URL & Semak Sambungan Live
-                        </button>
+                        <div class="flex items-center gap-3 pt-2">
+                            <button onclick="saveGSheetSettings()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center gap-2">
+                                <i class="fa-solid fa-floppy-disk"></i> Simpan Seting Google Sheet
+                            </button>
+                            <button onclick="testGSheetConnection()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition flex items-center gap-2">
+                                <i class="fa-solid fa-network-wired"></i> Uji Sambungan
+                            </button>
+                        </div>
+                    </div>
 
-                        <button onclick="syncStudentsFromGoogleSheets(true)" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
-                            <i id="sync-students-icon" class="fa-solid fa-rotate"></i> Tarik Data Murid Dari Google Sheets Sekarang
-                        </button>
-
-                        <div class="border-t border-slate-100 pt-3 space-y-2">
-                            <div class="flex justify-between items-center">
-                                <h4 class="text-xs font-bold text-slate-700">Kod Google Apps Script (.gs) Terkini (Senarai Murid & Kehadiran)</h4>
-                                <button onclick="copyAppsScriptCode()" class="text-xs text-emerald-600 font-semibold hover:underline">
-                                    <i class="fa-solid fa-copy"></i> Salin Kod
-                                </button>
-                            </div>
-                            <pre id="apps-script-code" class="bg-slate-900 text-slate-200 p-3 rounded-xl text-[10px] font-mono overflow-x-auto max-h-56 leading-relaxed">
-// ==========================================
-// KOD GOOGLE APPS SCRIPT (Code.gs) TERKINI
-// SISTEM KEHADIRAN RMT QR CODE (2 TAB / SHEET)
-// Tab 1: "SenaraiMurid"  (ID, Nama, Kelas)
-// Tab 2: "RekodKehadiran" (Nama, Kelas, Tarikh, Masa, Status)
-// ==========================================
+                    <!-- AppScript Code Box for Read/Write Multi-Device Live Sync -->
+                    <div class="bg-slate-900 text-slate-200 rounded-xl p-4 space-y-2 text-xs font-mono">
+                        <div class="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-2">
+                            <span>Kod Google Apps Script Multi-Device (Code.gs)</span>
+                            <button onclick="copyAppScriptCode()" class="hover:text-white"><i class="fa-solid fa-copy"></i> Salin Kod</button>
+                        </div>
+                        <pre id="appscript-code" class="overflow-x-auto text-[11px] leading-relaxed text-emerald-400">
+// KOD GOOGLE APPS SCRIPT UNTUK SIMPAN & AMBIL DATA LIVE
+function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    data.id || ("ATT_" + new Date().getTime()),
+    data.studentId,
+    data.studentName,
+    data.studentClass,
+    data.date,
+    data.scanTime,
+    data.status
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({"result":"success"})).setMimeType(ContentService.MimeType.JSON);
+}
 
 function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var action = e.parameter.action;
-
-  // 1. Ambil Senarai Murid RMT dari Tab "SenaraiMurid"
-  if (action === "getStudents") {
-    var studentSheet = ss.getSheetByName("SenaraiMurid");
-    if (!studentSheet) {
-      return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "Tab SenaraiMurid tidak dijumpai" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    var rows = studentSheet.getDataRange().getValues();
-    var students = [];
-    for (var i = 1; i < rows.length; i++) {
-      if (rows[i][0] !== "" && rows[i][0] !== undefined) {
-        students.push({
-          id: String(rows[i][0]),
-          name: String(rows[i][1]),
-          class: String(rows[i][2])
-        });
-      }
-    }
-    return ContentService.createTextOutput(JSON.stringify({ result: "success", data: students })).setMimeType(ContentService.MimeType.JSON);
-  }
-
-  // 2. Ambil Rekod Kehadiran dari Tab "RekodKehadiran"
-  var attendanceSheet = ss.getSheetByName("RekodKehadiran");
-  if (!attendanceSheet) {
-    return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "Tab RekodKehadiran tidak dijumpai" })).setMimeType(ContentService.MimeType.JSON);
-  }
-  var rowsLog = attendanceSheet.getDataRange().getValues();
-  var logs = [];
-  for (var j = 1; j < rowsLog.length; j++) {
-    if (rowsLog[j][0] !== "" && rowsLog[j][0] !== undefined) {
-      logs.push({
-        nama: String(rowsLog[j][0]),
-        kelas: String(rowsLog[j][1]),
-        tarikh: String(rowsLog[j][2]),
-        masa: String(rowsLog[j][3]),
-        status: String(rowsLog[j][4])
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var rows = sheet.getDataRange().getValues();
+  var records = [];
+  
+  // Mula dari indeks 1 untuk melangkau header/tajuk kolum
+  for (var i = 1; i < rows.length; i++) {
+    if(rows[i][0]) {
+      records.push({
+        id: rows[i][0],
+        studentId: rows[i][1],
+        studentName: rows[i][2],
+        studentClass: rows[i][3],
+        date: rows[i][4] ? String(rows[i][4]) : "",
+        scanTime: rows[i][5] ? String(rows[i][5]) : "",
+        status: rows[i][6] || "Hadir",
+        syncStatus: "Synced"
       });
     }
   }
-  logs.reverse();
-  return ContentService.createTextOutput(JSON.stringify({ result: "success", data: logs })).setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  var lock = LockService.getScriptLock();
-  lock.tryLock(10000);
-
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var data = JSON.parse(e.postData.contents);
-
-    // Simpan Murid Baharu ke Tab "SenaraiMurid"
-    if (data.type === "addStudent") {
-      var studentSheet = ss.getSheetByName("SenaraiMurid");
-      if (!studentSheet) {
-        studentSheet = ss.insertSheet("SenaraiMurid");
-        studentSheet.appendRow(["ID", "Nama", "Kelas"]);
-      }
-      studentSheet.appendRow([data.id, data.name, data.class]);
-      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Simpan Rekod Imbasan Kehadiran ke Tab "RekodKehadiran"
-    var attendanceSheet = ss.getSheetByName("RekodKehadiran");
-    if (!attendanceSheet) {
-      attendanceSheet = ss.insertSheet("RekodKehadiran");
-      attendanceSheet.appendRow(["Nama", "Kelas", "Tarikh", "Masa", "Status"]);
-    }
-    attendanceSheet.appendRow([data.nama, data.kelas, data.tarikh, data.masa, data.status]);
-
-    return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ result: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    lock.releaseLock();
-  }
+  return ContentService.createTextOutput(JSON.stringify(records)).setMimeType(ContentService.MimeType.JSON);
 }</pre>
-                        </div>
+                    </div>
+                </div>
+
+                <!-- Manage Students Database -->
+                <div class="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-5">
+                    <div class="border-b border-slate-100 pb-3 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                            <i class="fa-solid fa-database text-teal-600"></i> Pengurusan Pangkalan Data Murid
+                        </h3>
+                        <button onclick="openAddStudentModal()" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-emerald-200 transition">
+                            <i class="fa-solid fa-plus"></i> Tambah
+                        </button>
+                    </div>
+
+                    <div id="admin-students-list" class="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
+                        <!-- Dynamically populated list of students -->
                     </div>
                 </div>
             </div>
         </div>
+
     </main>
 
-    <!-- Modal Admin Password Login -->
-    <div id="admin-login-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-200 space-y-5">
-            <div class="text-center space-y-2">
-                <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
+    <!-- MODAL: ADMIN PASSWORD PROMPT -->
+    <div id="admin-auth-modal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl mx-auto flex items-center justify-center text-xl mb-2">
                     <i class="fa-solid fa-lock"></i>
                 </div>
-                <h3 class="text-lg font-bold text-slate-800">Akses Panel Pentadbir</h3>
-                <p class="text-xs text-slate-500">Sila masukkan kata laluan admin untuk meneruskan (Default: 123)</p>
+                <h3 class="font-bold text-slate-800 text-base">Akses Admin Panel</h3>
+                <p class="text-xs text-slate-500">Sila masukkan kata laluan keselamatan admin.</p>
             </div>
 
-            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+            <form onsubmit="verifyAdminPassword(event)" class="space-y-4">
                 <div>
-                    <input type="password" id="admin-password-input" required placeholder="Kata Laluan" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-center font-bold tracking-widest">
+                    <input type="password" id="admin-password-input" placeholder="Masukkan Kata Laluan" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center font-bold tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div id="admin-auth-error" class="hidden text-xs text-red-600 text-center font-semibold">
+                    Kata laluan salah! Sila cuba lagi.
                 </div>
                 <div class="flex gap-2">
-                    <button type="button" onclick="closeAdminModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition">
-                        Batal
-                    </button>
-                    <button type="submit" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition">
-                        Masuk
-                    </button>
+                    <button type="button" onclick="closeAdminAuthModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Batal</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md">Luar Kunci</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal Edit Murid -->
-    <div id="edit-student-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+    <!-- MODAL: ADD / EDIT STUDENT -->
+    <div id="student-modal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-user-pen text-amber-600"></i> Kemaskini Maklumat Murid
-                </h3>
-                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <h3 id="modal-title" class="font-bold text-slate-800 text-base">Tambah Murid RMT Baru</h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
 
-            <form onsubmit="handleSaveEditStudent(event)" class="space-y-4">
-                <input type="hidden" id="edit-student-id">
-                
+            <form id="student-form" onsubmit="handleSaveStudent(event)" class="space-y-4">
+                <input type="hidden" id="edit-student-index" value="-1">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">ID Murid (Kod QR)</label>
+                    <input type="text" id="modal-student-id" placeholder="RMT001" required class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Nama Penuh Murid</label>
-                    <input type="text" id="edit-student-name" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <input type="text" id="modal-student-name" placeholder="Ahmad Ali Bin Hassan" required class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
-
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Kelas Murid</label>
-                    <input type="text" id="edit-student-class" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Kelas</label>
+                    <input type="text" id="modal-student-class" placeholder="1 Cemerlang" required class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
-                <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeEditModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition">
-                        Batal
-                    </button>
-                    <button type="submit" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition">
-                        Simpan Perubahan
-                    </button>
+                <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                    <button type="button" onclick="closeStudentModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Batal</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md">Simpan Murid</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal Pengesahan Padam Murid -->
-    <div id="delete-confirm-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl">
-                <i class="fa-solid fa-triangle-exclamation"></i>
+    <!-- MODAL: CONFIRMATION DELETE -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4 text-center">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-2xl mx-auto flex items-center justify-center text-xl">
+                <i class="fa-solid fa-trash"></i>
             </div>
             <div>
-                <h3 class="text-lg font-bold text-slate-800">Sahkan Padam Murid</h3>
-                <p class="text-xs text-slate-500 mt-1" id="delete-modal-msg">Adakah anda pasti mahu memadam murid ini?</p>
+                <h3 class="font-bold text-slate-800 text-base">Padam Rekod Murid?</h3>
+                <p id="delete-confirm-msg" class="text-xs text-slate-500 mt-1">Adakah anda pasti mahu memadam murid ini?</p>
             </div>
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="closeDeleteModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition">
-                    Batal
-                </button>
-                <button type="button" id="confirm-delete-btn" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md transition">
-                    Ya, Padam
-                </button>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeDeleteModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Batal</button>
+                <button id="btn-confirm-delete" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow-md">Padam</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Paparan & Cetakan Kod QR -->
-    <div id="qr-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4 text-center">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-                <h3 class="font-bold text-slate-800 text-sm">Kad QR Murid RMT</h3>
-                <button onclick="closeQRModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="printable-qr-area" class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                <div id="qr-canvas-target" class="flex justify-center my-2"></div>
-                <div>
-                    <h4 id="qr-modal-name" class="font-bold text-slate-800 text-base">Nama Murid</h4>
-                    <p id="qr-modal-class" class="text-xs text-slate-500">Kelas</p>
-                    <span id="qr-modal-id" class="inline-block mt-1 font-mono text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">ID: RMT000</span>
-                </div>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="closeQRModal()" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition">
-                    Tutup
-                </button>
-                <button onclick="printQRCard()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-print"></i> Cetak Kad
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500">
-            Sistem Kehadiran Murid RMT Kod QR &bull; Direka khas untuk Guru RMT Sekolah
-        </div>
-    </footer>
-
-    <!-- JS Logic -->
+    <!-- MAIN JAVASCRIPT LOGIC -->
     <script>
-        // Global Variables
-        let studentsData = [
-            { id: "RMT001", name: "Ahmad Albab Bin Zulkifli", class: "4 Ibnu Sina" },
-            { id: "RMT002", name: "Siti Nurhaliza Binti Hassan", class: "3 Cemerlang" },
-            { id: "RMT003", name: "Muhammad Adam Rayyan", class: "2 Pintar" },
-            { id: "RMT004", name: "Nur Aisyah Humaira", class: "5 Ibnu Khaldun" }
+        // Sample Initial RMT Students Data
+        let students = [
+            { id: 'RMT001', name: 'Ahmad Faiz Bin Rosli', class: '1 Cemerlang' },
+            { id: 'RMT002', name: 'Siti Nur Aishah Binti Zakaria', class: '1 Cemerlang' },
+            { id: 'RMT003', name: 'Muhammad Adam Bin Abdullah', class: '2 Bijak' },
+            { id: 'RMT004', name: 'Nurul Huda Binti Ismail', class: '3 Pintar' },
+            { id: 'RMT005', name: 'Danial Harith Bin Zulkifli', class: '4 Maju' }
         ];
 
-        let attendanceLogs = [];
-        let gsScriptUrl = "";
-        let html5QrCode = null;
-        let isQRScannerActive = false;
-        let isAdminLoggedIn = false;
-        let studentIdToDelete = null;
-        let lastScannedQRId = null;
-        let lastScanTimestamp = 0;
+        // Attendance Records Array
+        let attendanceRecords = [];
 
-        // Cloud Multi-device Status UI Update
+        // Global Camera Scanner & Sync Timers
+        let html5QrCode = null;
+        let isScanning = false;
+        // URL Google Apps Script yang dihubungkan secara lalai
+        let gsheetUrl = 'https://script.google.com/macros/s/AKfycbzWKfkh4D5UsMUDdZAa4qxTv1iGt1vwsP2-6AI52MhpL0_hGFRrIvnWfYovDe6SZYuh/exec';
+        let liveSyncTimer = null;
+        let deleteTargetIndex = -1;
+
+        // Initialization on Load
+        window.onload = function() {
+            // Display Current Date
+            const today = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('current-date-text').innerText = 'Tarikh: ' + today.toLocaleDateString('ms-MY', options);
+
+            // Load saved settings if exists, otherwise default to provided Google Apps Script URL
+            const savedUrl = localStorage.getItem('rmt_gsheet_url');
+            if (savedUrl) {
+                gsheetUrl = savedUrl;
+            } else {
+                localStorage.setItem('rmt_gsheet_url', gsheetUrl);
+            }
+            document.getElementById('gsheet-url').value = gsheetUrl;
+            updateSheetStatusBadge(true);
+
+            // Load saved local attendance
+            const localRecs = localStorage.getItem('rmt_attendance_local');
+            if (localRecs) {
+                attendanceRecords = JSON.parse(localRecs);
+            }
+
+            renderDashboardStats();
+            renderAttendanceTable();
+            renderQRCards();
+            renderAdminStudentList();
+
+            // Fetch live data & start multi-device auto-polling if GSheet URL exists
+            if (gsheetUrl) {
+                fetchFromGoogleSheet();
+                startLiveAutoSync();
+            }
+        };
+
+        // Cloud Status UI Callback
         window.updateCloudStatusUI = function(connected) {
             const dot = document.getElementById('cloud-status-dot');
             const text = document.getElementById('cloud-status-text');
             if (connected) {
-                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
-                text.innerText = "Cloud Sync: Live (Multi-Device)";
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                text.innerText = 'Cloud Sync: Terhubung';
             } else {
-                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
-                text.innerText = "Cloud Sync: Offline";
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+                text.innerText = 'Cloud Sync: Mod Luar Talian';
             }
         };
 
-        // Realtime Firestore Listener across all devices
-        window.setupRealtimeListeners = function(appId) {
-            if (!window.db || !window.auth?.currentUser) return;
-            
-            import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js").then((firestore) => {
-                const studentsRef = firestore.collection(window.db, 'artifacts', appId, 'public', 'data', 'rmt_students');
-                firestore.onSnapshot(studentsRef, (snapshot) => {
-                    if (!snapshot.empty) {
-                        const fetchedStudents = [];
-                        snapshot.forEach((doc) => {
-                            fetchedStudents.push(doc.data());
-                        });
-                        fetchedStudents.sort((a, b) => a.id.localeCompare(b.id));
-                        studentsData = fetchedStudents;
-                    } else {
-                        studentsData.forEach(student => {
-                            const studentDocRef = firestore.doc(window.db, 'artifacts', appId, 'public', 'data', 'rmt_students', student.id);
-                            firestore.setDoc(studentDocRef, student);
-                        });
-                    }
-                    renderStudentsGrid();
-                    loadDashboardData();
-                }, (error) => console.error("Students Listener Error:", error));
-
-                const attendanceRef = firestore.collection(window.db, 'artifacts', appId, 'public', 'data', 'rmt_attendance');
-                firestore.onSnapshot(attendanceRef, (snapshot) => {
-                    const fetchedLogs = [];
-                    snapshot.forEach((doc) => {
-                        fetchedLogs.push(doc.data());
-                    });
-                    fetchedLogs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                    attendanceLogs = fetchedLogs;
-                    loadDashboardData();
-                }, (error) => console.error("Attendance Listener Error:", error));
-            });
-        };
-
-        // Tarik Senarai Murid Terus Daripada Google Sheets
-        window.syncStudentsFromGoogleSheets = async function(userTriggered = false) {
-            if (!gsScriptUrl) {
-                if (userTriggered) showToast("Sila masukkan URL Google Sheets di Panel Admin terlebih dahulu.", "warning");
-                return;
-            }
-
-            const syncIcon = document.getElementById('sync-students-icon');
-            if (syncIcon) syncIcon.classList.add('fa-spin');
-
-            try {
-                const res = await fetch(`${gsScriptUrl}?action=getStudents`);
-                const result = await res.json();
-
-                if (result && result.result === "success" && Array.isArray(result.data) && result.data.length > 0) {
-                    studentsData = result.data;
-                    localStorage.setItem('rmt_students', JSON.stringify(studentsData));
-
-                    // Kemaskini Awan (Firestore) secara latar belakang
-                    studentsData.forEach(student => {
-                        saveStudentToCloud(student);
-                    });
-
-                    renderStudentsGrid();
-                    loadDashboardData();
-                    if (userTriggered) showToast(`Berjaya menarik ${studentsData.length} orang murid dari Google Sheets!`, "success");
-                } else if (userTriggered) {
-                    showToast("Tiada data murid dijumpai dalam tab 'SenaraiMurid' di Google Sheets.", "warning");
-                }
-            } catch (err) {
-                console.error("GS Students Fetch Error:", err);
-                if (userTriggered) showToast("Gagal mengambil senarai murid dari Google Sheets.", "error");
-            } finally {
-                if (syncIcon) syncIcon.classList.remove('fa-spin');
-            }
-        };
-
-        // Save new student to Cloud Database & Sync to Google Sheets
-        async function saveStudentToCloud(student) {
-            if (!window.db || !window.auth?.currentUser) return;
-            try {
-                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'rmt-system-default';
-                const studentDocRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'rmt_students', student.id);
-                await setDoc(studentDocRef, student);
-            } catch (e) {
-                console.error("Error saving student to cloud:", e);
-            }
-        }
-
-        async function syncNewStudentToGoogleSheets(student) {
-            if (!gsScriptUrl) return;
-            try {
-                await fetch(gsScriptUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: "addStudent",
-                        id: student.id,
-                        name: student.name,
-                        class: student.class
-                    })
-                });
-            } catch (err) {
-                console.error("GS Student Sync Error:", err);
-            }
-        }
-
-        // Delete student from Cloud Database
-        async function deleteStudentFromCloud(studentId) {
-            if (!window.db || !window.auth?.currentUser) return;
-            try {
-                const { doc, deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'rmt-system-default';
-                const studentDocRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'rmt_students', studentId);
-                await deleteDoc(studentDocRef);
-            } catch (e) {
-                console.error("Error deleting student from cloud:", e);
-            }
-        }
-
-        // Save attendance record to Cloud Database
-        async function saveAttendanceToCloud(logData) {
-            if (!window.db || !window.auth?.currentUser) return;
-            try {
-                const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'rmt-system-default';
-                const docId = `${logData.nama.replace(/\s+/g, '_')}_${logData.tarikh.replace(/\//g, '-')}`;
-                const logDocRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'rmt_attendance', docId);
-                await setDoc(logDocRef, logData);
-            } catch (e) {
-                console.error("Error saving attendance to cloud:", e);
-            }
-        }
-
-        // Sound synthesizer
-        function playBeepSound(type = 'success') {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                if (type === 'success') {
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-                    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.3);
-                } else if (type === 'error') {
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-                    osc.frequency.setValueAtTime(164.81, audioCtx.currentTime + 0.15);
-                    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.35);
-                } else if (type === 'warning') {
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.2);
-                }
-            } catch (e) {
-                console.log("Audio feedback error:", e);
-            }
-        }
-
-        window.escapeHtml = function(str) {
-            if (!str) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        };
-
-        window.switchTab = function(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active', 'bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
-                btn.classList.add('text-slate-600');
-            });
-
-            const selectedContent = document.getElementById('tab-' + tabId);
-            const selectedBtn = document.getElementById('tab-btn-' + tabId);
-
-            if (selectedContent) selectedContent.classList.remove('hidden');
-            if (selectedBtn) {
-                selectedBtn.classList.add('active', 'bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
-                selectedBtn.classList.remove('text-slate-600');
-            }
-
-            if (tabId !== 'scan' && isQRScannerActive) {
+        // Tab Navigation Switcher
+        function switchTab(tabId) {
+            if (tabId !== 'scan' && isScanning) {
                 stopQRScanner();
             }
 
-            if (tabId === 'dashboard') {
-                loadDashboardData();
-            }
-        };
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = 'tab-btn flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all duration-200 text-slate-600';
+            });
 
-        window.attemptAdminAccess = function() {
-            if (isAdminLoggedIn) {
-                switchTab('admin');
-            } else {
-                document.getElementById('admin-password-input').value = '';
-                document.getElementById('admin-login-modal').classList.remove('hidden');
-            }
-        };
-
-        window.handleAdminLogin = function(e) {
-            e.preventDefault();
-            const pwd = document.getElementById('admin-password-input').value;
-            
-            if (pwd === "123") {
-                isAdminLoggedIn = true;
-                closeAdminModal();
-                showToast("Berjaya log masuk sebagai Admin!", "success");
-                switchTab('admin');
-                renderStudentsGrid();
-            } else {
-                showToast("Kata laluan salah! Sila cuba lagi.", "error");
-            }
-        };
-
-        window.closeAdminModal = function() {
-            document.getElementById('admin-login-modal').classList.add('hidden');
-        };
-
-        window.lockAdminSession = function() {
-            isAdminLoggedIn = false;
-            showToast("Anda telah log keluar daripada Panel Admin.", "info");
-            switchTab('dashboard');
-            renderStudentsGrid();
-        };
-
-        function loadSavedData() {
-            const savedStudents = localStorage.getItem('rmt_students');
-            if (savedStudents) {
-                try { studentsData = JSON.parse(savedStudents); } catch(e){}
-            }
-
-            const savedLogs = localStorage.getItem('rmt_attendance_logs');
-            if (savedLogs) {
-                try { attendanceLogs = JSON.parse(savedLogs); } catch(e){}
-            }
-
-            const savedGSUrl = localStorage.getItem('rmt_gs_url');
-            if (savedGSUrl) {
-                gsScriptUrl = savedGSUrl;
-                const gsInput = document.getElementById('gs-app-url');
-                if (gsInput) gsInput.value = savedGSUrl;
-                // Auto sync senarai murid sebaik sahaja web dimuatkan jika URL sedia ada
-                syncStudentsFromGoogleSheets(false);
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + tabId);
+            if (activeBtn) {
+                activeBtn.className = 'tab-btn active flex-1 sm:flex-none px-4 py-2 rounded-lg transition-all duration-200 bg-emerald-50 text-emerald-700 border border-emerald-200';
             }
         }
 
-        // QR CODE SCANNING LOGIC
-        window.startQRScanner = async function() {
-            const placeholder = document.getElementById('camera-placeholder');
-            const laser = document.getElementById('scanner-laser');
-            const cameraBadge = document.getElementById('camera-badge');
+        // Admin Security Check (Password: 123)
+        function attemptAdminAccess() {
+            document.getElementById('admin-password-input').value = '';
+            document.getElementById('admin-auth-error').classList.add('hidden');
+            document.getElementById('admin-auth-modal').classList.remove('hidden');
+        }
 
-            try {
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("qr-reader");
-                }
+        function closeAdminAuthModal() {
+            document.getElementById('admin-auth-modal').classList.add('hidden');
+        }
 
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-                
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    config,
-                    onQRCodeScanned,
-                    onQRScanError
-                );
+        function verifyAdminPassword(e) {
+            e.preventDefault();
+            const pass = document.getElementById('admin-password-input').value;
+            if (pass === '123') {
+                closeAdminAuthModal();
+                switchTab('admin');
+                showToast("Akses Admin Diberikan!", "success");
+            } else {
+                document.getElementById('admin-auth-error').classList.remove('hidden');
+            }
+        }
 
-                placeholder.classList.add('hidden');
-                laser.classList.remove('hidden');
+        // Camera QR Scanner Functions
+        function startQRScanner() {
+            if (isScanning) return;
 
-                cameraBadge.className = "px-2.5 py-1 bg-emerald-100 text-emerald-700 font-semibold text-xs rounded-full flex items-center gap-1.5";
-                cameraBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Pengimbas QR Aktif`;
+            document.getElementById('camera-placeholder').classList.add('hidden');
+            document.getElementById('scanner-laser').classList.remove('hidden');
 
+            html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).then(() => {
+                isScanning = true;
+                document.getElementById('camera-badge').className = 'px-2.5 py-1 bg-emerald-100 text-emerald-700 font-semibold text-xs rounded-full flex items-center gap-1.5';
+                document.getElementById('camera-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Pengimbas Aktif';
                 document.getElementById('btn-start-cam').disabled = true;
                 document.getElementById('btn-start-cam').classList.add('opacity-50', 'cursor-not-allowed');
                 document.getElementById('btn-stop-cam').disabled = false;
-                document.getElementById('btn-stop-cam').className = "px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md cursor-pointer";
-
-                isQRScannerActive = true;
-                showToast("Pengimbas QR automatik diaktifkan.", "info");
-            } catch (err) {
-                showToast("Gagal mengaktifkan pengimbas QR: " + err.message, "error");
-            }
-        };
-
-        function onQRCodeScanned(decodedText, decodedResult) {
-            const now = Date.now();
-            if (lastScannedQRId === decodedText && (now - lastScanTimestamp) < 5000) {
-                return;
-            }
-
-            lastScannedQRId = decodedText;
-            lastScanTimestamp = now;
-
-            processQRScannedCode(decodedText);
+                document.getElementById('btn-stop-cam').className = 'px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md';
+            }).catch(err => {
+                console.error("Camera Init Error:", err);
+                showToast("Gagal mengakses kamera peranti. Sila benarkan kebenaran kamera.", "error");
+                stopQRScanner();
+            });
         }
 
-        function onQRScanError(errorMessage) {}
-
-        window.stopQRScanner = async function() {
-            if (html5QrCode && isQRScannerActive) {
-                try {
-                    await html5QrCode.stop();
-                } catch(e) {}
+        function stopQRScanner() {
+            if (html5QrCode && isScanning) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    isScanning = false;
+                    resetCameraUI();
+                }).catch(err => {
+                    console.error("Stop Camera Error:", err);
+                    resetCameraUI();
+                });
+            } else {
+                resetCameraUI();
             }
-
-            const placeholder = document.getElementById('camera-placeholder');
-            const laser = document.getElementById('scanner-laser');
-            const cameraBadge = document.getElementById('camera-badge');
-
-            if (placeholder) placeholder.classList.remove('hidden');
-            if (laser) laser.classList.add('hidden');
-
-            if (cameraBadge) {
-                cameraBadge.className = "px-2.5 py-1 bg-red-100 text-red-600 font-semibold text-xs rounded-full flex items-center gap-1.5";
-                cameraBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Pengimbas Mati`;
-            }
-
-            const btnStart = document.getElementById('btn-start-cam');
-            const btnStop = document.getElementById('btn-stop-cam');
-            if (btnStart) {
-                btnStart.disabled = false;
-                btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
-            if (btnStop) {
-                btnStop.disabled = true;
-                btnStop.className = "px-5 py-3 bg-slate-200 text-slate-400 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 cursor-not-allowed";
-            }
-
-            isQRScannerActive = false;
-        };
-
-        function processQRScannedCode(scannedId) {
-            const cleanId = scannedId.trim();
-            const student = studentsData.find(s => s.id.toLowerCase() === cleanId.toLowerCase());
-
-            if (!student) {
-                playBeepSound('error');
-                highlightCameraBox('error');
-                showToast(`Kod QR "${cleanId}" tidak wujud dalam pangkalan data!`, "error");
-                return;
-            }
-
-            processAttendanceRecord(student);
         }
 
-        window.handleManualQRSubmit = function() {
+        function resetCameraUI() {
+            isScanning = false;
+            document.getElementById('camera-placeholder').classList.remove('hidden');
+            document.getElementById('scanner-laser').classList.add('hidden');
+            document.getElementById('camera-badge').className = 'px-2.5 py-1 bg-red-100 text-red-600 font-semibold text-xs rounded-full flex items-center gap-1.5';
+            document.getElementById('camera-badge').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Pengimbas Mati';
+            document.getElementById('btn-start-cam').disabled = false;
+            document.getElementById('btn-start-cam').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('btn-stop-cam').disabled = true;
+            document.getElementById('btn-stop-cam').className = 'px-5 py-3 bg-slate-200 text-slate-400 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 cursor-not-allowed';
+        }
+
+        function onScanSuccess(decodedText) {
+            processStudentScan(decodedText.trim());
+        }
+
+        function onScanFailure(error) {
+            // Silence frame scanning errors
+        }
+
+        function handleManualQRSubmit() {
             const val = document.getElementById('manual-qr-input').value.trim();
             if (!val) {
-                showToast("Sila masukkan ID Murid atau imbas QR.", "warning");
+                showToast("Sila masukkan Kod QR / ID Murid", "error");
                 return;
             }
-            processQRScannedCode(val);
+            processStudentScan(val);
             document.getElementById('manual-qr-input').value = '';
-        };
-
-        function highlightCameraBox(status = 'success') {
-            const container = document.getElementById('camera-box-container');
-            if (!container) return;
-
-            container.classList.remove('ring-4', 'ring-emerald-500', 'border-emerald-500', 'ring-red-500', 'border-red-500', 'ring-amber-500', 'border-amber-500');
-
-            if (status === 'success') {
-                container.classList.add('ring-4', 'ring-emerald-500', 'border-emerald-500');
-                setTimeout(() => container.classList.remove('ring-4', 'ring-emerald-500', 'border-emerald-500'), 1200);
-            } else if (status === 'error') {
-                container.classList.add('ring-4', 'ring-red-500', 'border-red-500');
-                setTimeout(() => container.classList.remove('ring-4', 'ring-red-500', 'border-red-500'), 1200);
-            } else if (status === 'warning') {
-                container.classList.add('ring-4', 'ring-amber-500', 'border-amber-500');
-                setTimeout(() => container.classList.remove('ring-4', 'ring-amber-500', 'border-amber-500'), 1200);
-            }
         }
 
-        function processAttendanceRecord(student) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
-            const dateStr = now.toLocaleDateString('ms-MY');
+        function simulateQRScan() {
+            const randomStudent = students[Math.floor(Math.random() * students.length)];
+            processStudentScan(randomStudent.id);
+        }
 
-            const alreadyScanned = attendanceLogs.some(log => log.nama.toLowerCase() === student.name.toLowerCase() && log.tarikh === dateStr);
+        // Processing Attendance Scans
+        function processStudentScan(studentId) {
+            const student = students.find(s => s.id.toUpperCase() === studentId.toUpperCase());
 
-            if (alreadyScanned) {
-                playBeepSound('warning');
-                highlightCameraBox('warning');
-                showToast(`AMARAN: ${student.name} telah pun imbas & mengambil makanan RMT hari ini!`, "warning");
+            if (!student) {
+                showToast(`Kod QR '${studentId}' tidak didaftarkan dalam rekod murid!`, "error");
                 return;
             }
 
+            const todayStr = new Date().toISOString().split('T')[0];
+            const nowTimeStr = new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const alreadyScanned = attendanceRecords.find(r => r.studentId === student.id && r.date === todayStr);
+
+            if (alreadyScanned) {
+                showToast(`Murid ${student.name} TELAH mengimbas kehadiran hari ini pada ${alreadyScanned.scanTime}!`, "warning");
+                displayLatestScanResult(student, alreadyScanned.scanTime, true);
+                return;
+            }
+
+            const record = {
+                id: 'ATT_' + Date.now(),
+                studentId: student.id,
+                studentName: student.name,
+                studentClass: student.class,
+                date: todayStr,
+                scanTime: nowTimeStr,
+                status: 'Hadir & Makanan Diambil',
+                syncStatus: 'Pending'
+            };
+
+            attendanceRecords.unshift(record);
+            localStorage.setItem('rmt_attendance_local', JSON.stringify(attendanceRecords));
+
+            displayLatestScanResult(student, nowTimeStr, false);
+            playScanBeep();
+            showToast(`Berjaya! Kehadiran ${student.name} telah direkodkan.`, "success");
+
+            if (gsheetUrl) {
+                sendToGoogleSheet(record);
+            }
+
+            renderDashboardStats();
+            renderAttendanceTable();
+        }
+
+        function displayLatestScanResult(student, timeStr, isDuplicate) {
             document.getElementById('scan-idle').classList.add('hidden');
             const resBox = document.getElementById('scan-result');
             resBox.classList.remove('hidden');
 
             document.getElementById('res-student-name').innerText = student.name;
-            document.getElementById('res-student-class').innerText = "Kelas: " + student.class;
-            document.getElementById('res-scan-time').innerHTML = `<i class="fa-solid fa-clock"></i> Masa: ${timeStr}`;
-            document.getElementById('res-student-id-badge').innerText = `ID: ${student.id}`;
+            document.getElementById('res-student-class').innerText = 'Kelas: ' + student.class;
+            document.getElementById('res-student-id-badge').innerText = 'ID: ' + student.id;
+            document.getElementById('res-scan-time').innerText = timeStr;
 
-            const newLog = {
-                nama: student.name,
-                kelas: student.class,
-                tarikh: dateStr,
-                masa: timeStr,
-                status: "Hadir (RMT Taken)",
-                timestamp: Date.now()
-            };
-
-            saveAttendanceToCloud(newLog);
-
-            if (gsScriptUrl) {
-                syncAttendanceToGoogleSheets(newLog);
+            const sheetStatusEl = document.getElementById('res-sheet-status');
+            if (gsheetUrl) {
+                sheetStatusEl.innerText = 'Dihantar ke Google Sheets';
+                sheetStatusEl.className = 'font-bold text-emerald-600';
+            } else {
+                sheetStatusEl.innerText = 'Bukan Terhubung (Lokal)';
+                sheetStatusEl.className = 'font-bold text-amber-600';
             }
-
-            loadDashboardData();
-            playBeepSound('success');
-            highlightCameraBox('success');
-            showToast(`KEHADIRAN BERJAYA: ${student.name} (${student.class})`, "success");
         }
 
-        window.simulateQRScan = function() {
-            if (studentsData.length === 0) {
-                showToast("Tiada murid terdaftar untuk diimbas.", "warning");
-                return;
-            }
+        // Send Scan Record to Google Sheet Webapp
+        function sendToGoogleSheet(record) {
+            if (!gsheetUrl) return;
 
-            const randomIndex = Math.floor(Math.random() * studentsData.length);
-            const randomStudent = studentsData[randomIndex];
-            processAttendanceRecord(randomStudent);
-        };
-
-        window.handleDateFilterChange = function() {
-            const filterType = document.getElementById('date-filter-type').value;
-            const datePicker = document.getElementById('custom-date-picker');
-
-            if (filterType === 'custom') {
-                datePicker.classList.remove('hidden');
-                if (!datePicker.value) {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
-                    const day = String(now.getDate()).padStart(2, '0');
-                    datePicker.value = `${year}-${month}-${day}`;
-                }
-            } else {
-                datePicker.classList.add('hidden');
-            }
-
-            filterAttendanceTable();
-        };
-
-        function getFilteredAttendanceLogs() {
-            const filterType = document.getElementById('date-filter-type')?.value || 'today';
-            const searchQuery = (document.getElementById('search-attendance')?.value || '').toLowerCase().trim();
-            const todayFormatted = new Date().toLocaleDateString('ms-MY');
-            const customDatePicker = document.getElementById('custom-date-picker');
-
-            return attendanceLogs.filter(log => {
-                let matchesDate = true;
-                if (filterType === 'today') {
-                    matchesDate = (log.tarikh === todayFormatted);
-                } else if (filterType === 'custom' && customDatePicker && customDatePicker.value) {
-                    const selectedDate = new Date(customDatePicker.value);
-                    const formattedSelected = selectedDate.toLocaleDateString('ms-MY');
-                    matchesDate = (log.tarikh === formattedSelected);
-                }
-
-                let matchesSearch = true;
-                if (searchQuery) {
-                    matchesSearch = (log.nama.toLowerCase().includes(searchQuery) || log.kelas.toLowerCase().includes(searchQuery));
-                }
-
-                return matchesDate && matchesSearch;
+            fetch(gsheetUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(record)
+            }).then(() => {
+                record.syncStatus = 'Synced';
+                renderAttendanceTable();
+            }).catch(err => {
+                console.error("GSheet Post Error:", err);
             });
         }
 
-        window.loadDashboardData = function() {
-            const filteredLogs = getFilteredAttendanceLogs();
+        // Fetch Live Attendance Data from Google Sheet across all devices
+        function fetchFromGoogleSheet() {
+            if (!gsheetUrl) return;
 
-            const totalStudents = studentsData.length;
-            const presentCount = filteredLogs.length;
-            const absentCount = Math.max(0, totalStudents - presentCount);
-            const rate = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+            fetch(gsheetUrl)
+                .then(res => res.json())
+                .then(remoteRecords => {
+                    if (Array.isArray(remoteRecords) && remoteRecords.length > 0) {
+                        // Merge remote records into local attendance array
+                        remoteRecords.forEach(rem => {
+                            const exists = attendanceRecords.some(loc => loc.id === rem.id || (loc.studentId === rem.studentId && loc.date === rem.date));
+                            if (!exists) {
+                                attendanceRecords.unshift(rem);
+                            }
+                        });
+                        localStorage.setItem('rmt_attendance_local', JSON.stringify(attendanceRecords));
+                        renderDashboardStats();
+                        renderAttendanceTable();
+                    }
+                })
+                .catch(err => {
+                    console.log("Auto-sync polling info:", err);
+                });
+        }
 
-            document.getElementById('stat-total').innerText = totalStudents;
-            document.getElementById('stat-present').innerText = presentCount;
-            document.getElementById('stat-absent').innerText = absentCount;
-            document.getElementById('stat-rate').innerText = rate + "%";
-            document.getElementById('stat-progress').style.width = rate + "%";
+        // Live Auto-Polling Interval (Every 5 Seconds)
+        function startLiveAutoSync() {
+            if (liveSyncTimer) clearInterval(liveSyncTimer);
+            liveSyncTimer = setInterval(() => {
+                fetchFromGoogleSheet();
+            }, 5000);
+        }
 
-            renderAttendanceTable(filteredLogs);
-        };
+        // Dashboard Stat Calculations
+        function renderDashboardStats() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const todayRecords = attendanceRecords.filter(r => r.date === todayStr);
 
-        function renderAttendanceTable(logs) {
+            const total = students.length;
+            const present = todayRecords.length;
+            const absent = Math.max(0, total - present);
+            const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-present').innerText = present;
+            document.getElementById('stat-absent').innerText = absent;
+            document.getElementById('stat-rate').innerText = rate + '%';
+            document.getElementById('stat-progress').style.width = rate + '%';
+        }
+
+        // Table Filtering & Rendering
+        function handleDateFilterChange() {
+            const filterType = document.getElementById('date-filter-type').value;
+            const customPicker = document.getElementById('custom-date-picker');
+            if (filterType === 'custom') {
+                customPicker.classList.remove('hidden');
+            } else {
+                customPicker.classList.add('hidden');
+                filterAttendanceTable();
+            }
+        }
+
+        function filterAttendanceTable() {
+            const filterType = document.getElementById('date-filter-type').value;
+            const customDate = document.getElementById('custom-date-picker').value;
+            const searchVal = document.getElementById('search-attendance').value.toLowerCase();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            let filtered = [...attendanceRecords];
+
+            if (filterType === 'today') {
+                filtered = filtered.filter(r => r.date === todayStr);
+            } else if (filterType === 'custom' && customDate) {
+                filtered = filtered.filter(r => r.date === customDate);
+            }
+
+            if (searchVal) {
+                filtered = filtered.filter(r =>
+                    r.studentName.toLowerCase().includes(searchVal) ||
+                    r.studentClass.toLowerCase().includes(searchVal) ||
+                    r.studentId.toLowerCase().includes(searchVal)
+                );
+            }
+
+            renderTableRows(filtered);
+        }
+
+        function renderAttendanceTable() {
+            filterAttendanceTable();
+        }
+
+        function renderTableRows(records) {
             const tbody = document.getElementById('attendance-table-body');
             tbody.innerHTML = '';
 
-            if (logs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 text-xs">Tiada rekod imbasan kehadiran RMT ditemui bagi tapisan ini.</td></tr>`;
+            if (records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">Tiada rekod imbasan Kehadiran RMT dijumpai.</td></tr>`;
                 return;
             }
 
-            logs.forEach((log, index) => {
+            records.forEach((r, idx) => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50/80 transition";
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
                 tr.innerHTML = `
-                    <td class="p-4 font-mono text-xs text-slate-400">${index + 1}</td>
-                    <td class="p-4 font-bold text-slate-800">${escapeHtml(log.nama)}</td>
-                    <td class="p-4 text-slate-600">${escapeHtml(log.kelas)}</td>
-                    <td class="p-4 text-slate-600 font-mono text-xs"><i class="fa-solid fa-calendar text-slate-400 mr-1"></i>${escapeHtml(log.tarikh)}</td>
-                    <td class="p-4 text-slate-600 font-mono text-xs"><i class="fa-solid fa-clock text-slate-400 mr-1"></i>${escapeHtml(log.masa)}</td>
+                    <td class="p-4 font-semibold text-slate-400">${idx + 1}</td>
+                    <td class="p-4 font-bold text-slate-800">${r.studentName}</td>
+                    <td class="p-4 text-slate-600">${r.studentClass}</td>
+                    <td class="p-4 font-mono text-slate-500">${r.date}</td>
+                    <td class="p-4 font-mono text-slate-700 font-semibold">${r.scanTime}</td>
                     <td class="p-4">
-                        <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full inline-flex items-center gap-1">
-                            <i class="fa-solid fa-check"></i> Hadir RMT
+                        <span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded-full inline-flex items-center gap-1">
+                            <i class="fa-solid fa-check text-emerald-600"></i> ${r.status}
                         </span>
                     </td>
-                    <td class="p-4 text-xs text-slate-500 flex items-center gap-1.5">
-                        <i class="fa-solid fa-cloud text-emerald-500"></i> Synced Live
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 ${r.syncStatus === 'Synced' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'} font-bold text-[10px] rounded-full">
+                            ${r.syncStatus || 'Lokal'}
+                        </span>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        window.filterAttendanceTable = function() {
-            loadDashboardData();
-        };
+        // Render QR Printable Cards
+        function renderQRCards() {
+            const container = document.getElementById('printable-qr-area');
+            container.innerHTML = '';
 
-        window.renderStudentsGrid = function() {
-            const grid = document.getElementById('students-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
-
-            if (studentsData.length === 0) {
-                grid.innerHTML = `<p class="text-xs text-slate-400 col-span-full py-8 text-center">Tiada murid terdaftar dalam senarai.</p>`;
-                return;
-            }
-
-            studentsData.forEach(student => {
+            students.forEach((student, idx) => {
                 const card = document.createElement('div');
-                card.className = "bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center justify-between space-x-3 hover:shadow-sm transition";
-                
-                const adminActionButtons = isAdminLoggedIn ? `
-                    <div class="flex items-center space-x-1 shrink-0">
-                        <button onclick="openQRModal('${student.id}')" class="text-emerald-600 hover:text-emerald-700 p-1.5 transition" title="Lihat/Cetak QR">
-                            <i class="fa-solid fa-qrcode text-base"></i>
-                        </button>
-                        <button onclick="openEditStudentModal('${student.id}')" class="text-slate-400 hover:text-amber-600 p-1.5 transition" title="Edit Murid">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                        <button onclick="deleteStudent('${student.id}')" class="text-slate-400 hover:text-red-500 p-1.5 transition" title="Padam Murid">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </div>
-                ` : `
-                    <button onclick="openQRModal('${student.id}')" class="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                        <i class="fa-solid fa-qrcode"></i> Kad QR
-                    </button>
-                `;
-
+                card.className = 'bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm flex flex-col items-center text-center space-y-3 relative overflow-hidden';
                 card.innerHTML = `
-                    <div class="flex items-center space-x-3 min-w-0 flex-1">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0 border border-emerald-200">
-                            ${escapeHtml(student.name.charAt(0))}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <h4 class="font-bold text-sm text-slate-800 truncate">${escapeHtml(student.name)}</h4>
-                            <p class="text-xs text-slate-500 truncate">${escapeHtml(student.class)}</p>
-                            <p class="text-[10px] text-emerald-600 font-mono font-bold mt-0.5"><i class="fa-solid fa-id-badge"></i> ID: ${student.id}</p>
-                        </div>
+                    <div class="w-full bg-emerald-700 text-white py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider">
+                        KAD KEHADIRAN RMT SEKOLAH
                     </div>
-                    ${adminActionButtons}
+                    <div id="qrcode-${idx}" class="p-2 bg-white border border-slate-100 rounded-xl shadow-inner"></div>
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-sm">${student.name}</h4>
+                        <p class="text-xs text-slate-500 font-medium">Kelas: ${student.class}</p>
+                        <span class="inline-block mt-1 px-3 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-xs rounded-full">
+                            ${student.id}
+                        </span>
+                    </div>
                 `;
-                grid.appendChild(card);
+                container.appendChild(card);
+
+                setTimeout(() => {
+                    new QRCode(document.getElementById(`qrcode-${idx}`), {
+                        text: student.id,
+                        width: 120,
+                        height: 120,
+                        colorDark : "#0f172a",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }, 50);
             });
-        };
-
-        window.openQRModal = function(studentId) {
-            const student = studentsData.find(s => s.id === studentId);
-            if (!student) return;
-
-            document.getElementById('qr-modal-name').innerText = student.name;
-            document.getElementById('qr-modal-class').innerText = "Kelas: " + student.class;
-            document.getElementById('qr-modal-id').innerText = "ID: " + student.id;
-
-            const qrTarget = document.getElementById('qr-canvas-target');
-            qrTarget.innerHTML = '';
-            
-            new QRCode(qrTarget, {
-                text: student.id,
-                width: 140,
-                height: 140,
-                colorDark: "#064e3b",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-
-            document.getElementById('qr-modal').classList.remove('hidden');
-        };
-
-        window.closeQRModal = function() {
-            document.getElementById('qr-modal').classList.add('hidden');
-        };
-
-        window.printQRCard = function() {
-            window.print();
-        };
-
-        window.openEditStudentModal = function(id) {
-            const student = studentsData.find(s => s.id === id);
-            if (!student) return;
-
-            document.getElementById('edit-student-id').value = student.id;
-            document.getElementById('edit-student-name').value = student.name;
-            document.getElementById('edit-student-class').value = student.class;
-
-            document.getElementById('edit-student-modal').classList.remove('hidden');
-        };
-
-        window.closeEditModal = function() {
-            document.getElementById('edit-student-modal').classList.add('hidden');
-        };
-
-        window.deleteStudent = function(id) {
-            const student = studentsData.find(s => s.id === id);
-            if (!student) return;
-
-            studentIdToDelete = id;
-            document.getElementById('delete-modal-msg').innerText = `Adakah anda pasti mahu memadam rekod RMT murid "${student.name}"?`;
-            
-            const confirmBtn = document.getElementById('confirm-delete-btn');
-            confirmBtn.onclick = function() {
-                executeDeleteStudent();
-            };
-
-            document.getElementById('delete-confirm-modal').classList.remove('hidden');
-        };
-
-        window.closeDeleteModal = function() {
-            studentIdToDelete = null;
-            document.getElementById('delete-confirm-modal').classList.add('hidden');
-        };
-
-        function executeDeleteStudent() {
-            if (!studentIdToDelete) return;
-            
-            const deletedId = studentIdToDelete;
-            deleteStudentFromCloud(deletedId);
-            studentsData = studentsData.filter(s => s.id !== deletedId);
-            
-            renderStudentsGrid();
-            loadDashboardData();
-            closeDeleteModal();
-            showToast("Maklumat murid telah dipadam secara serentak di semua peranti.", "info");
         }
 
-        window.handleSaveEditStudent = function(e) {
-            e.preventDefault();
-            const id = document.getElementById('edit-student-id').value;
-            const newName = document.getElementById('edit-student-name').value.trim();
-            const newClass = document.getElementById('edit-student-class').value.trim();
+        // Admin Student Management List
+        function renderAdminStudentList() {
+            const listContainer = document.getElementById('admin-students-list');
+            listContainer.innerHTML = '';
 
-            const updatedStudent = { id, name: newName, class: newClass };
-            saveStudentToCloud(updatedStudent);
-            syncNewStudentToGoogleSheets(updatedStudent);
-
-            const index = studentsData.findIndex(s => s.id === id);
-            if (index !== -1) {
-                studentsData[index] = updatedStudent;
-                renderStudentsGrid();
-                loadDashboardData();
-                closeEditModal();
-                showToast("Maklumat murid dikemaskini!", "success");
-            }
-        };
-
-        window.handleRegisterStudent = function(e) {
-            e.preventDefault();
-
-            const name = document.getElementById('reg-name').value.trim();
-            const className = document.getElementById('reg-class').value.trim();
-
-            if (!name || !className) {
-                showToast("Sila lengkapkan nama murid dan kelas.", "warning");
-                return;
-            }
-
-            const newStudentId = "RMT" + (studentsData.length + 1).toString().padStart(3, '0');
-
-            const newStudent = {
-                id: newStudentId,
-                name: name,
-                class: className
-            };
-
-            saveStudentToCloud(newStudent);
-            syncNewStudentToGoogleSheets(newStudent);
-            document.getElementById('form-register-student').reset();
-
-            renderStudentsGrid();
-            loadDashboardData();
-            showToast(`Murid ${name} berjaya didaftarkan ke Awan & Google Sheets (ID: ${newStudentId})!`, "success");
-            openQRModal(newStudentId);
-        };
-
-        window.handleFileUpload = function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const content = e.target.result;
-                document.getElementById('bulk-input').value = content;
-                showToast(`Fail "${file.name}" berjaya dibaca! Tekan butang Import di bawah.`, "success");
-            };
-            reader.onerror = function() {
-                showToast("Gagal membaca fail dokumen.", "error");
-            };
-            reader.readAsText(file);
-        };
-
-        window.handleBulkRegisterStudents = function(e) {
-            e.preventDefault();
-            const rawText = document.getElementById('bulk-input').value.trim();
-            if (!rawText) {
-                showToast("Sila masukkan senarai murid atau muat naik fail dokumen.", "warning");
-                return;
-            }
-
-            const lines = rawText.split('\n');
-            let addedCount = 0;
-
-            lines.forEach(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine) {
-                    const parts = trimmedLine.split(',');
-                    const name = parts[0] ? parts[0].trim() : '';
-                    const className = parts[1] ? parts[1].trim() : 'Biasa';
-
-                    if (name && name.toLowerCase() !== 'nama' && name.toLowerCase() !== 'nama murid') {
-                        const nextIdNum = studentsData.length + 1;
-                        const newStudentId = "RMT" + nextIdNum.toString().padStart(3, '0');
-                        const newStudent = {
-                            id: newStudentId,
-                            name: name,
-                            class: className
-                        };
-                        saveStudentToCloud(newStudent);
-                        syncNewStudentToGoogleSheets(newStudent);
-                        addedCount++;
-                    }
-                }
+            students.forEach((s, index) => {
+                const item = document.createElement('div');
+                item.className = 'py-3 flex items-center justify-between gap-3';
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-700 font-bold text-xs flex items-center justify-center shrink-0">
+                            ${s.id}
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-xs">${s.name}</h4>
+                            <p class="text-[11px] text-slate-400">Kelas: ${s.class}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="editStudent(${index})" class="p-1.5 text-slate-400 hover:text-teal-600 transition"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="promptDeleteStudent(${index})" class="p-1.5 text-slate-400 hover:text-red-600 transition"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
             });
+        }
 
-            if (addedCount > 0) {
-                document.getElementById('bulk-input').value = '';
-                const fileInput = document.getElementById('file-upload-input');
-                if (fileInput) fileInput.value = '';
-                
-                renderStudentsGrid();
-                loadDashboardData();
-                showToast(`Berjaya menambah ${addedCount} orang murid secara pukal!`, "success");
+        // Student Modal & Actions
+        function openAddStudentModal() {
+            document.getElementById('edit-student-index').value = "-1";
+            document.getElementById('modal-title').innerText = "Tambah Murid RMT Baru";
+            document.getElementById('modal-student-id').value = "RMT" + String(students.length + 1).padStart(3, '0');
+            document.getElementById('modal-student-name').value = "";
+            document.getElementById('modal-student-class').value = "";
+            document.getElementById('student-modal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('student-modal').classList.add('hidden');
+        }
+
+        function handleSaveStudent(e) {
+            e.preventDefault();
+            const idx = parseInt(document.getElementById('edit-student-index').value);
+            const id = document.getElementById('modal-student-id').value.trim().toUpperCase();
+            const name = document.getElementById('modal-student-name').value.trim();
+            const className = document.getElementById('modal-student-class').value.trim();
+
+            if (idx === -1) {
+                students.push({ id, name, class: className });
+                showToast("Murid baru berjaya ditambah!", "success");
             } else {
-                showToast("Format input tidak sah. Gunakan format: Nama, Kelas", "error");
+                students[idx] = { id, name, class: className };
+                showToast("Maklumat murid berjaya dikemas kini!", "success");
             }
-        };
 
-        window.saveGSUrl = function() {
-            const url = document.getElementById('gs-app-url').value.trim();
-            gsScriptUrl = url;
-            localStorage.setItem('rmt_gs_url', url);
+            closeStudentModal();
+            renderDashboardStats();
+            renderQRCards();
+            renderAdminStudentList();
+        }
+
+        function editStudent(index) {
+            const s = students[index];
+            document.getElementById('edit-student-index').value = index;
+            document.getElementById('modal-title').innerText = "Kemas Kini Murid RMT";
+            document.getElementById('modal-student-id').value = s.id;
+            document.getElementById('modal-student-name').value = s.name;
+            document.getElementById('modal-student-class').value = s.class;
+            document.getElementById('student-modal').classList.remove('hidden');
+        }
+
+        function promptDeleteStudent(index) {
+            deleteTargetIndex = index;
+            document.getElementById('delete-confirm-msg').innerText = `Adakah anda pasti mahu memadam murid ${students[index].name}?`;
+            document.getElementById('btn-confirm-delete').onclick = confirmDeleteStudent;
+            document.getElementById('delete-confirm-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-confirm-modal').classList.add('hidden');
+            deleteTargetIndex = -1;
+        }
+
+        function confirmDeleteStudent() {
+            if (deleteTargetIndex > -1) {
+                students.splice(deleteTargetIndex, 1);
+                renderDashboardStats();
+                renderQRCards();
+                renderAdminStudentList();
+                showToast("Murid telah dipadam dari pangkalan data.", "success");
+            }
+            closeDeleteModal();
+        }
+
+        // Google Sheets Settings
+        function saveGSheetSettings() {
+            const url = document.getElementById('gsheet-url').value.trim();
+            gsheetUrl = url;
+            localStorage.setItem('rmt_gsheet_url', url);
+            updateSheetStatusBadge(!!url);
+            showToast("Seting Google Sheet berjaya disimpan!", "success");
 
             if (url) {
-                showToast("URL Google Sheets disimpan! Mengambil senarai murid...", "success");
-                syncStudentsFromGoogleSheets(true);
-            } else {
-                showToast("Tetapan Google Sheets dikosongkan.", "info");
-            }
-        };
-
-        async function syncAttendanceToGoogleSheets(logData) {
-            if (!gsScriptUrl) return;
-
-            try {
-                await fetch(gsScriptUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(logData)
-                });
-                const el = document.getElementById('res-sheet-status');
-                if (el) el.innerHTML = `Tersimpan <i class="fa-solid fa-cloud-arrow-up text-emerald-500"></i>`;
-            } catch (err) {
-                console.error("GS Sync Error:", err);
+                fetchFromGoogleSheet();
+                startLiveAutoSync();
             }
         }
 
-        window.copyAppsScriptCode = function() {
-            const codeText = document.getElementById('apps-script-code').innerText;
-            const textarea = document.createElement('textarea');
-            textarea.value = codeText;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                showToast("Kod Google Apps Script berjaya disalin!", "success");
-            } catch (err) {
-                showToast("Gagal menyalin kod.", "error");
+        function updateSheetStatusBadge(connected) {
+            const badge = document.getElementById('sheet-status-badge');
+            if (connected) {
+                badge.className = 'px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full';
+                badge.innerText = 'Terhubung';
+            } else {
+                badge.className = 'px-2.5 py-1 bg-slate-100 text-slate-600 font-bold text-xs rounded-full';
+                badge.innerText = 'Tutup';
             }
-            document.body.removeChild(textarea);
-        };
+        }
 
-        window.exportCSV = function() {
-            if (attendanceLogs.length === 0) {
-                showToast("Tiada rekod data kehadiran untuk dimuat turun.", "warning");
+        function testGSheetConnection() {
+            if (!gsheetUrl) {
+                showToast("Sila masukkan Web App URL terlebih dahulu!", "error");
+                return;
+            }
+            showToast("Menguji sambungan ke Google Sheets...", "info");
+            sendToGoogleSheet({
+                id: 'TEST_' + Date.now(),
+                studentId: 'RMT000',
+                studentName: 'Ujian Sambungan System',
+                studentClass: 'Ujian',
+                date: new Date().toISOString().split('T')[0],
+                scanTime: new Date().toLocaleTimeString(),
+                status: 'Test'
+            });
+            setTimeout(() => {
+                showToast("Isyarat ujian telah dihantar ke Google Sheets!", "success");
+            }, 1000);
+        }
+
+        function copyAppScriptCode() {
+            const code = document.getElementById('appscript-code').innerText;
+            
+            // Fallback for clipboard API restrictions in iframe/sandboxed environments
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = code;
+            tempTextArea.style.position = "fixed";  // Avoid scrolling to bottom
+            tempTextArea.style.opacity = "0";
+            document.body.appendChild(tempTextArea);
+            tempTextArea.focus();
+            tempTextArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast("Kod Google Apps Script telah disalin!", "success");
+                } else {
+                    showToast("Gagal menyalin kod. Sila salin secara manual.", "error");
+                }
+            } catch (err) {
+                showToast("Ralat semasa menyalin kod.", "error");
+            }
+            
+            document.body.removeChild(tempTextArea);
+        }
+
+        // Utility: Export CSV
+        function exportCSV() {
+            if (attendanceRecords.length === 0) {
+                showToast("Tiada rekod untuk dieksport!", "error");
                 return;
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Nama Murid,Kelas,Tarikh,Masa Imbasan,Status RMT\n";
-
-            attendanceLogs.forEach(log => {
-                const row = `"${log.nama}","${log.kelas}","${log.tarikh}","${log.masa}","${log.status}"`;
-                csvContent += row + "\n";
+            let csvContent = "data:text/csv;charset=utf-8,ID,Nama Murid,Kelas,Tarikh,Masa Imbasan,Status\n";
+            attendanceRecords.forEach(r => {
+                csvContent += `"${r.studentId}","${r.studentName}","${r.studentClass}","${r.date}","${r.scanTime}","${r.status}"\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Kehadiran_RMT_QR_${new Date().toISOString().slice(0,10)}.csv`);
+            link.setAttribute("download", `Rekod_Kehadiran_RMT_${new Date().toISOString().split('T')[0]}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            showToast("Fail CSV Kehadiran berjaya dimuat turun!", "success");
-        };
+        }
 
-        window.showToast = function(message, type = "info") {
+        // Audio Feedback
+        function playScanBeep() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        // Toast Notification System
+        function showToast(msg, type = "info") {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toast-msg');
             const toastIcon = document.getElementById('toast-icon');
 
-            if (!toast || !toastMsg || !toastIcon) return;
+            toastMsg.innerText = msg;
 
-            toastMsg.innerText = message;
-
-            if (type === "success") {
-                toast.className = "mb-4 p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-emerald-600";
-                toastIcon.className = "fa-solid fa-circle-check text-xl";
-            } else if (type === "error") {
-                toast.className = "mb-4 p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-red-600";
-                toastIcon.className = "fa-solid fa-triangle-exclamation text-xl";
-            } else if (type === "warning") {
-                toast.className = "mb-4 p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-amber-600";
-                toastIcon.className = "fa-solid fa-circle-exclamation text-xl";
+            if (type === 'success') {
+                toast.className = 'p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-emerald-600';
+                toastIcon.className = 'fa-solid fa-circle-check text-xl';
+            } else if (type === 'error') {
+                toast.className = 'p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-red-600';
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-xl';
+            } else if (type === 'warning') {
+                toast.className = 'p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-amber-500';
+                toastIcon.className = 'fa-solid fa-triangle-exclamation text-xl';
             } else {
-                toast.className = "mb-4 p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-slate-800";
-                toastIcon.className = "fa-solid fa-circle-info text-xl";
+                toast.className = 'p-4 rounded-xl shadow-lg text-white font-medium flex items-center justify-between transition-all duration-300 bg-teal-600';
+                toastIcon.className = 'fa-solid fa-circle-info text-xl';
             }
 
             toast.classList.remove('hidden');
@@ -1613,24 +1214,11 @@ function doPost(e) {
             setTimeout(() => {
                 hideToast();
             }, 4000);
-        };
+        }
 
-        window.hideToast = function() {
-            const toast = document.getElementById('toast');
-            if (toast) toast.classList.add('hidden');
-        };
-
-        window.onload = function() {
-            const todayStr = new Date().toLocaleDateString('ms-MY', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            const dateElem = document.getElementById('current-date-text');
-            if (dateElem) {
-                dateElem.innerText = 'Tarikh: ' + todayStr;
-            }
-
-            loadSavedData();
-            renderStudentsGrid();
-            loadDashboardData();
-        };
+        function hideToast() {
+            document.getElementById('toast').classList.add('hidden');
+        }
     </script>
 </body>
 </html>
