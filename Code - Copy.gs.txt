@@ -1,0 +1,506 @@
+/**
+ * SISTEM KEHADIRAN RMT
+ * Backend Google Apps Script + Google Sheets.
+ *
+ * PENTING:
+ * 1. Jalankan setupSystem() sekali daripada editor Apps Script.
+ * 2. Buka Execution log untuk melihat URL Google Sheets dan kata laluan admin sementara.
+ * 3. Log masuk dan tukar kata laluan admin dengan segera.
+ * 4. Deploy sebagai Web app. URL deployment mesti menggunakan HTTPS untuk kamera QR.
+ */
+
+const APP = {
+  title: 'Sistem Kehadiran RMT',
+  sheets: {
+    USERS: 'Pengguna',
+    STUDENTS: 'Murid',
+    ATTENDANCE: 'Kehadiran',
+    SETTINGS: 'Tetapan'
+  },
+  sessionHours: 8
+};
+
+function setupSystem() {
+  const props = PropertiesService.getScriptProperties();
+  let ss;
+  const existingId = props.getProperty('RMT_SPREADSHEET_ID');
+
+  if (existingId) {
+    try { ss = SpreadsheetApp.openById(existingId); } catch (e) {}
+  }
+  if (!ss) {
+    ss = SpreadsheetApp.create('Pangkalan Data Sistem Kehadiran RMT');
+    props.setProperty('RMT_SPREADSHEET_ID', ss.getId());
+  }
+
+  createSheetIfMissing_(ss, APP.sheets.USERS, [
+    'Username', 'Salt', 'PasswordHash', 'Role', 'Nama', 'Aktif', 'DiciptaPada'
+  ]);
+  createSheetIfMissing_(ss, APP.sheets.STUDENTS, [
+    'IDMurid', 'Nama', 'Kelas', 'NoKP/IDSekolah', 'Aktif', 'DiciptaPada'
+  ]);
+  createSheetIfMissing_(ss, APP.sheets.ATTENDANCE, [
+    'IDRekod', 'Tarikh', 'IDMurid', 'NamaMurid', 'Kelas', 'Status',
+    'MasaRekod', 'Kaedah', 'Catatan', 'DirekodOleh'
+  ]);
+  createSheetIfMissing_(ss, APP.sheets.SETTINGS, ['Tetapan', 'Nilai']);
+
+  const settings = ss.getSheetByName(APP.sheets.SETTINGS);
+  if (settings.getLastRow() < 2) {
+    settings.getRange(2, 1, 4, 2).setValues([
+      ['NamaSekolah', 'Sila isi nama sekolah'],
+      ['ZonMasa', 'Asia/Kuala_Lumpur'],
+      ['VersiSistem', '1.0'],
+      ['TarikhSetup', new Date()]
+    ]);
+  }
+
+  const users = ss.getSheetByName(APP.sheets.USERS);
+  let temporaryPassword = '';
+  if (users.getLastRow() < 2) {
+    temporaryPassword = randomPassword_();
+    const salt = Utilities.getUuid();
+    users.appendRow(['admin', salt, hashPassword_(temporaryPassword, salt), 'admin', 'Pentadbir Sistem', true, new Date()]);
+  }
+
+  // Ensure the signing secret exists.
+  if (!props.getProperty('RMT_SESSION_SECRET')) {
+    props.setProperty('RMT_SESSION_SECRET', Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid());
+  }
+
+  Logger.log('Pangkalan data Google Sheets: ' + ss.getUrl());
+  Logger.log('Spreadsheet ID disimpan dalam Script Properties.');
+  if (temporaryPassword) {
+    Logger.log('AKAUN ADMIN AWAL — Username: admin | Kata laluan sementara: ' + temporaryPassword);
+    Logger.log('Sila simpan kata laluan ini, log masuk dan tukar kata laluan dengan segera.');
+  } else {
+    Logger.log('Pengguna sedia ada dikekalkan. Tiada kata laluan baharu dijana.');
+  }
+  return ss.getUrl();
+}
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+    .setTitle(APP.title)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function getSpreadsheet_() {
+  const id = PropertiesService.getScriptProperties().getProperty('RMT_SPREADSHEET_ID');
+  if (!id) throw new Error('Sistem belum disediakan. Jalankan setupSystem() dahulu.');
+  return SpreadsheetApp.openById(id);
+}
+
+function createSheetIfMissing_(ss, name, headers) {
+  let sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#173b67').setFontColor('#ffffff');
+    sh.autoResizeColumns(1, headers.length);
+  }
+  return sh;
+}
+
+function randomPassword_() {
+  return Utilities.getUuid().replace(/-/g, '').slice(0, 4) + 'Rmt!' + Math.floor(1000 + Math.random() * 9000);
+}
+
+function hashPassword_(password, salt) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(salt) + '|' + String(password),
+    Utilities.Charset.UTF_8
+  );
+  return Utilities.base64EncodeWebSafe(bytes);
+}
+
+function login(username, password) {
+  username = clean_(username, 80);
+  password = String(password || '');
+  if (!username || !password) throw new Error('Masukkan nama pengguna dan kata laluan.');
+
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.USERS);
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    const r = values[i];
+    if (String(r[0]).toLowerCase() === username.toLowerCase() && truthy_(r[5])) {
+      if (hashPassword_(password, r[1]) !== String(r[2])) break;
+      const user = { username: String(r[0]), role: String(r[3]), name: String(r[4]) };
+      return { token: issueToken_(user), user: user };
+    }
+  }
+  throw new Error('Nama pengguna atau kata laluan tidak sah.');
+}
+
+function issueToken_(user) {
+  const payload = {
+    u: user.username,
+    r: user.role,
+    n: user.name,
+    exp: Date.now() + APP.sessionHours * 60 * 60 * 1000,
+    nonce: Utilities.getUuid()
+  };
+  const encoded = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
+  const secret = PropertiesService.getScriptProperties().getProperty('RMT_SESSION_SECRET');
+  const signature = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(encoded, secret)
+  ).replace(/=+$/, '');
+  return encoded + '.' + signature;
+}
+
+function requireUser_(token, adminOnly) {
+  if (!token || String(token).indexOf('.') < 0) throw new Error('Sesi tamat. Sila log masuk semula.');
+  const parts = String(token).split('.');
+  const secret = PropertiesService.getScriptProperties().getProperty('RMT_SESSION_SECRET');
+  const expected = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(parts[0], secret)
+  ).replace(/=+$/, '');
+  if (parts[1] !== expected) throw new Error('Sesi tidak sah. Sila log masuk semula.');
+
+  let p;
+  try { p = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString()); }
+  catch (e) { throw new Error('Sesi tidak sah. Sila log masuk semula.'); }
+  if (!p.exp || Date.now() > p.exp) throw new Error('Sesi tamat. Sila log masuk semula.');
+
+  // Re-check user status and role from the database on every request.
+  const users = getSpreadsheet_().getSheetByName(APP.sheets.USERS).getDataRange().getValues();
+  let current = null;
+  for (let i = 1; i < users.length; i++) {
+    if (String(users[i][0]) === String(p.u) && truthy_(users[i][5])) {
+      current = { username: String(users[i][0]), role: String(users[i][3]), name: String(users[i][4]) };
+      break;
+    }
+  }
+  if (!current) throw new Error('Akaun tidak aktif. Hubungi pentadbir.');
+  if (adminOnly && current.role !== 'admin') throw new Error('Akses ini hanya untuk pentadbir.');
+  return current;
+}
+
+function getAppData(token) {
+  const user = requireUser_(token, false);
+  const ss = getSpreadsheet_();
+  const students = readStudents_(ss, true);
+  const today = todayKey_();
+  const records = readAttendanceForDate_(ss, today);
+  const present = records.filter(r => r.status === 'Hadir').length;
+  const absent = records.filter(r => r.status === 'Tidak Hadir').length;
+  const classes = [...new Set(students.map(s => s.kelas).filter(Boolean))].sort();
+  const settings = readSettings_(ss);
+  return {
+    user: user,
+    title: APP.title,
+    school: settings.NamaSekolah || 'Sekolah',
+    today: today,
+    students: students,
+    classes: classes,
+    todayRecords: records,
+    stats: {
+      totalStudents: students.length,
+      recorded: records.length,
+      present: present,
+      absent: absent,
+      notRecorded: Math.max(0, students.length - records.length),
+      percentage: students.length ? Math.round((present / students.length) * 1000) / 10 : 0
+    }
+  };
+}
+
+function readStudents_(ss, activeOnly) {
+  const sh = ss.getSheetByName(APP.sheets.STUDENTS);
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues()
+    .filter(r => !activeOnly || truthy_(r[4]))
+    .map(r => ({
+      id: String(r[0]), nama: String(r[1]), kelas: String(r[2]),
+      noId: String(r[3] || ''), aktif: truthy_(r[4])
+    }));
+}
+
+function readAttendanceForDate_(ss, dateKey) {
+  const sh = ss.getSheetByName(APP.sheets.ATTENDANCE);
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 10).getValues()
+    .filter(r => dateKey_(r[1]) === dateKey)
+    .map(r => ({
+      idRekod: String(r[0]), tarikh: dateKey_(r[1]), idMurid: String(r[2]),
+      nama: String(r[3]), kelas: String(r[4]), status: String(r[5]),
+      masa: r[6] instanceof Date ? Utilities.formatDate(r[6], Session.getScriptTimeZone(), 'HH:mm:ss') : String(r[6]),
+      kaedah: String(r[7]), catatan: String(r[8] || ''), oleh: String(r[9] || '')
+    }));
+}
+
+function markAttendance(token, studentId, status, notes, method) {
+  const user = requireUser_(token, false);
+  studentId = clean_(studentId, 100);
+  status = status === 'Tidak Hadir' ? 'Tidak Hadir' : 'Hadir';
+  method = method === 'Manual' ? 'Manual' : 'QR';
+  notes = clean_(notes, 300);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = getSpreadsheet_();
+    const students = readStudents_(ss, true);
+    const student = students.find(s => s.id === studentId);
+    if (!student) throw new Error('Murid tidak ditemui atau telah dinyahaktifkan.');
+
+    const sh = ss.getSheetByName(APP.sheets.ATTENDANCE);
+    const today = todayKey_();
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][2]) === studentId && dateKey_(data[i][1]) === today) {
+        return {
+          ok: false, duplicate: true,
+          message: student.nama + ' sudah mempunyai rekod hari ini (' + data[i][5] + ').',
+          record: { idMurid: studentId, nama: student.nama, kelas: student.kelas, status: String(data[i][5]) }
+        };
+      }
+    }
+    sh.appendRow([
+      Utilities.getUuid(), todayAsDate_(), student.id, student.nama, student.kelas,
+      status, new Date(), method, notes, user.username
+    ]);
+    return { ok: true, duplicate: false, message: 'Kehadiran ' + student.nama + ' berjaya direkodkan.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setManualAttendance(token, studentId, status, notes) {
+  const user = requireUser_(token, false);
+  studentId = clean_(studentId, 100);
+  status = status === 'Tidak Hadir' ? 'Tidak Hadir' : 'Hadir';
+  notes = clean_(notes, 300);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = getSpreadsheet_();
+    const student = readStudents_(ss, true).find(s => s.id === studentId);
+    if (!student) throw new Error('Murid tidak ditemui atau tidak aktif.');
+    const sh = ss.getSheetByName(APP.sheets.ATTENDANCE);
+    const today = todayKey_();
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][2]) === studentId && dateKey_(data[i][1]) === today) {
+        sh.getRange(i + 1, 6, 1, 1).setValue(status);
+        sh.getRange(i + 1, 9, 1, 1).setValue(notes);
+        sh.getRange(i + 1, 8, 1, 1).setValue('Manual');
+        sh.getRange(i + 1, 10, 1, 1).setValue(user.username);
+        return { ok: true, message: 'Rekod ' + student.nama + ' berjaya dikemas kini.' };
+      }
+    }
+    sh.appendRow([
+      Utilities.getUuid(), todayAsDate_(), student.id, student.nama, student.kelas,
+      status, new Date(), 'Manual', notes, user.username
+    ]);
+    return { ok: true, message: 'Kehadiran ' + student.nama + ' berjaya direkodkan.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function addStudent(token, student) {
+  requireUser_(token, true);
+  const nama = clean_(student && student.nama, 150);
+  const kelas = clean_(student && student.kelas, 60);
+  const noId = clean_(student && student.noId, 100);
+  if (!nama || !kelas) throw new Error('Nama murid dan kelas wajib diisi.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = getSpreadsheet_().getSheetByName(APP.sheets.STUDENTS);
+    const id = 'RMT-' + Utilities.getUuid().split('-')[0].toUpperCase();
+    sh.appendRow([id, nama, kelas, noId, true, new Date()]);
+    return { ok: true, student: { id: id, nama: nama, kelas: kelas, noId: noId, aktif: true } };
+  } finally { lock.releaseLock(); }
+}
+
+function importStudents(token, rows) {
+  requireUser_(token, true);
+  if (!Array.isArray(rows) || !rows.length) throw new Error('Tiada data murid untuk diimport.');
+  if (rows.length > 500) throw new Error('Import dihadkan kepada 500 murid setiap kali.');
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.STUDENTS);
+  const existing = readStudents_(getSpreadsheet_(), false);
+  const seen = new Set(existing.map(s => (s.nama + '|' + s.kelas).toLowerCase()));
+  const out = [];
+  rows.forEach(r => {
+    const nama = clean_(r.nama, 150), kelas = clean_(r.kelas, 60), noId = clean_(r.noId, 100);
+    if (!nama || !kelas) return;
+    const key = (nama + '|' + kelas).toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(['RMT-' + Utilities.getUuid().split('-')[0].toUpperCase(), nama, kelas, noId, true, new Date()]);
+  });
+  if (out.length) sh.getRange(sh.getLastRow() + 1, 1, out.length, 6).setValues(out);
+  return { added: out.length, skipped: rows.length - out.length };
+}
+
+function deactivateStudent(token, studentId) {
+  requireUser_(token, true);
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.STUDENTS);
+  if (sh.getLastRow() < 2) throw new Error('Tiada data murid.');
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(studentId)) {
+      sh.getRange(i + 1, 5).setValue(false);
+      return { ok: true };
+    }
+  }
+  throw new Error('Murid tidak ditemui.');
+}
+
+function addUser(token, username, password, name, role) {
+  requireUser_(token, true);
+  username = clean_(username, 80);
+  password = String(password || '');
+  name = clean_(name, 150);
+  role = role === 'admin' ? 'admin' : 'guru';
+  if (!/^[A-Za-z0-9._-]{3,80}$/.test(username)) throw new Error('Username: 3–80 aksara, gunakan huruf, nombor, titik, garis atau underscore.');
+  if (password.length < 10) throw new Error('Kata laluan mesti sekurang-kurangnya 10 aksara.');
+  if (!name) throw new Error('Nama pengguna wajib diisi.');
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.USERS);
+  const values = sh.getDataRange().getValues();
+  if (values.slice(1).some(r => String(r[0]).toLowerCase() === username.toLowerCase())) {
+    throw new Error('Username sudah digunakan.');
+  }
+  const salt = Utilities.getUuid();
+  sh.appendRow([username, salt, hashPassword_(password, salt), role, name, true, new Date()]);
+  return { ok: true };
+}
+
+function changePassword(token, oldPassword, newPassword) {
+  const user = requireUser_(token, false);
+  oldPassword = String(oldPassword || '');
+  newPassword = String(newPassword || '');
+  if (newPassword.length < 10) throw new Error('Kata laluan baharu mesti sekurang-kurangnya 10 aksara.');
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.USERS);
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === user.username) {
+      if (hashPassword_(oldPassword, values[i][1]) !== String(values[i][2])) throw new Error('Kata laluan semasa tidak betul.');
+      const salt = Utilities.getUuid();
+      sh.getRange(i + 1, 2, 1, 2).setValues([[salt, hashPassword_(newPassword, salt)]]);
+      return { ok: true };
+    }
+  }
+  throw new Error('Akaun tidak ditemui.');
+}
+
+function getReport(token, fromDate, toDate, className) {
+  requireUser_(token, false);
+  const ss = getSpreadsheet_();
+  const students = readStudents_(ss, true);
+  const sh = ss.getSheetByName(APP.sheets.ATTENDANCE);
+  const from = normalizeDateInput_(fromDate) || todayKey_();
+  const to = normalizeDateInput_(toDate) || from;
+  if (from > to) throw new Error('Tarikh mula tidak boleh selepas tarikh akhir.');
+  const all = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, 10).getValues();
+  const rows = all.filter(r => {
+    const d = dateKey_(r[1]);
+    return d >= from && d <= to && (!className || className === 'Semua Kelas' || String(r[4]) === className);
+  }).map(r => ({
+    tarikh: dateKey_(r[1]), idMurid: String(r[2]), nama: String(r[3]),
+    kelas: String(r[4]), status: String(r[5]), masa: r[6] instanceof Date ?
+      Utilities.formatDate(r[6], Session.getScriptTimeZone(), 'HH:mm:ss') : String(r[6]),
+    kaedah: String(r[7]), catatan: String(r[8] || ''), oleh: String(r[9] || '')
+  }));
+  const present = rows.filter(r => r.status === 'Hadir').length;
+  const absent = rows.filter(r => r.status === 'Tidak Hadir').length;
+  const uniqueDates = [...new Set(rows.map(r => r.tarikh))].sort();
+  const summaryByClass = {};
+  rows.forEach(r => {
+    if (!summaryByClass[r.kelas]) summaryByClass[r.kelas] = { kelas: r.kelas, hadir: 0, tidakHadir: 0, rekod: 0 };
+    summaryByClass[r.kelas].rekod++;
+    if (r.status === 'Hadir') summaryByClass[r.kelas].hadir++;
+    else summaryByClass[r.kelas].tidakHadir++;
+  });
+  return {
+    from: from, to: to, rows: rows,
+    summary: {
+      totalRecords: rows.length, present: present, absent: absent,
+      rate: rows.length ? Math.round(present / rows.length * 1000) / 10 : 0,
+      dates: uniqueDates.length
+    },
+    byClass: Object.keys(summaryByClass).sort().map(k => summaryByClass[k])
+  };
+}
+
+function saveSettings(token, schoolName) {
+  requireUser_(token, true);
+  schoolName = clean_(schoolName, 200);
+  if (!schoolName) throw new Error('Nama sekolah wajib diisi.');
+  const sh = getSpreadsheet_().getSheetByName(APP.sheets.SETTINGS);
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === 'NamaSekolah') {
+      sh.getRange(i + 1, 2).setValue(schoolName);
+      return { ok: true };
+    }
+  }
+  sh.appendRow(['NamaSekolah', schoolName]);
+  return { ok: true };
+}
+
+function readSettings_(ss) {
+  const sh = ss.getSheetByName(APP.sheets.SETTINGS);
+  const result = {};
+  if (sh.getLastRow() >= 2) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(r => result[String(r[0])] = r[1]);
+  }
+  return result;
+}
+
+function todayKey_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Asia/Kuala_Lumpur', 'yyyy-MM-dd');
+}
+function todayAsDate_() {
+  const parts = todayKey_().split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function dateKey_(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone() || 'Asia/Kuala_Lumpur', 'yyyy-MM-dd');
+  const s = String(value || '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? '' : Utilities.formatDate(d, Session.getScriptTimeZone() || 'Asia/Kuala_Lumpur', 'yyyy-MM-dd');
+}
+function normalizeDateInput_(v) {
+  const s = String(v || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+}
+function clean_(v, max) {
+  return String(v == null ? '' : v).trim().replace(/[<>]/g, '').slice(0, max || 200);
+}
+function truthy_(v) {
+  return v === true || String(v).toLowerCase() === 'true' || String(v) === '1' || String(v).toLowerCase() === 'ya';
+}
+
+function setAdminPasswordTo123() {
+  const ss = getSpreadsheet_();
+  const sh = ss.getSheetByName(APP.sheets.USERS);
+  const values = sh.getDataRange().getValues();
+  
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).toLowerCase() === 'admin') {
+      const newSalt = Utilities.getUuid();
+      const newHash = hashPassword_('123', newSalt);
+      
+      // Kemas kini Salt, PasswordHash, dan Aktifkan Akaun
+      sh.getRange(i + 1, 2, 1, 2).setValues([[newSalt, newHash]]);
+      sh.getRange(i + 1, 6).setValue(true); 
+      
+      Logger.log('BERJAYA! Kata laluan bagi admin telah ditukar kepada 123.');
+      return;
+    }
+  }
+  
+  // Jika pengguna admin belum wujud
+  const newSalt = Utilities.getUuid();
+  const newHash = hashPassword_('123', newSalt);
+  sh.appendRow(['admin', newSalt, newHash, 'admin', 'Pentadbir Sistem', true, new Date()]);
+  Logger.log('BERJAYA! Akaun admin baharu cipta dengan kata laluan: 123.');
+}
